@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Qué mueve el precio de Bitcoin</title>
+<meta name="description" content="Puntaje de cuánto aporta cada variable al movimiento del precio de Bitcoin, medido fuera de muestra contra un piso de ruido.">
+<style>
+:root{
+  --bg:#0b0f14; --card:#111823; --line:#1c2632; --grid:#232e3c;
+  --text:#e6edf3; --dim:#8b949e; --mut:#5c6773;
+  --up:#26d07c; --down:#ff5d6c; --acc:#5fa8ff; --oro:#d6a84f; --ruido:#4a5563;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:13px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;padding:0 0 40px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+a{color:var(--acc)}
+
+header{border-bottom:1px solid var(--line);padding:14px 0 12px;margin-bottom:16px}
+.fila{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+h1{margin:0;font-size:13px;font-weight:700;letter-spacing:.05em;white-space:nowrap}
+h1 span{color:var(--mut);font-weight:500}
+nav{display:flex;gap:14px;font-size:11px}
+nav a{color:var(--dim);text-decoration:none} nav a:hover{color:var(--acc)}
+.est{margin-left:auto;font-size:10.5px;color:var(--mut);display:flex;align-items:center;gap:8px}
+button{background:var(--card);border:1px solid var(--line);color:var(--dim);border-radius:6px;
+  padding:6px 12px;font:inherit;font-size:11.5px;cursor:pointer}
+button:hover{border-color:var(--acc);color:var(--text)}
+button:disabled{opacity:.5;cursor:not-allowed}
+
+.tabs{display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap}
+.tabs button.on{border-color:var(--acc);background:#152232;color:var(--text);font-weight:700}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;
+  padding:14px 16px;margin-bottom:14px;min-width:0;overflow:hidden}
+.card h2{margin:0 0 3px;font-size:12px;font-weight:700;letter-spacing:.05em}
+.sub{margin:0 0 12px;font-size:10.5px;color:var(--mut);line-height:1.5}
+
+/* veredicto */
+.ver{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.ver .gr{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.ver .tx{font-size:11.5px;color:var(--dim);max-width:560px;line-height:1.55}
+.ver .tx b{color:var(--text)}
+
+/* familias */
+.fam{display:grid;grid-template-columns:1fr;gap:7px}
+.frow{display:grid;grid-template-columns:168px 1fr 92px;gap:10px;align-items:center}
+.frow .n{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar{height:15px;background:#0d131a;border-radius:4px;overflow:hidden;position:relative}
+.bar i{display:block;height:100%;border-radius:4px}
+.frow .c{font-size:10.5px;color:var(--mut);text-align:right;font-variant-numeric:tabular-nums}
+
+/* tabla de variables */
+table{width:100%;border-collapse:collapse;font-size:11.5px}
+th{text-align:left;color:var(--mut);font-weight:600;font-size:9.5px;text-transform:uppercase;
+  letter-spacing:.05em;padding:6px 8px;border-bottom:1px solid var(--grid);white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr.debil td{opacity:.45}
+.pos{color:var(--mut);font-variant-numeric:tabular-nums;width:26px;text-align:right}
+.nom{font-weight:600;white-space:nowrap}
+.fa{font-size:10px;color:var(--mut);white-space:nowrap}
+.mult{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap;text-align:right}
+.tblwrap{overflow-x:auto}
+
+/* acelerómetro: dónde está la variable hoy */
+.acel{position:relative;height:16px;min-width:104px;background:linear-gradient(90deg,
+  rgba(95,168,255,.13) 0%, rgba(95,168,255,.05) 50%, rgba(214,168,79,.16) 100%);
+  border-radius:8px;border:1px solid var(--grid)}
+.acel i{position:absolute;top:-2px;width:3px;height:18px;border-radius:2px;background:var(--text);
+  box-shadow:0 0 5px rgba(0,0,0,.7)}
+.acel b{position:absolute;top:0;left:50%;width:1px;height:100%;background:var(--grid)}
+.acelT{font-size:9.5px;color:var(--mut);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.pill{display:inline-block;padding:1px 7px;border-radius:9px;font-size:9.5px;font-weight:700}
+.pill.si{background:rgba(38,208,124,.15);color:var(--up)}
+.pill.no{background:rgba(139,148,158,.12);color:var(--mut)}
+
+.nota{color:var(--mut);font-size:10.5px;line-height:1.6;margin-top:10px}
+.err{background:rgba(255,93,108,.08);border:1px solid rgba(255,93,108,.25);border-radius:8px;
+  padding:11px 14px;font-size:11.5px;color:#ff8791;margin-bottom:12px}
+code{background:#0b0f14;border:1px solid var(--line);border-radius:4px;padding:1px 5px;
+  font-size:10.5px;color:var(--dim)}
+@media (max-width:720px){
+  .frow{grid-template-columns:120px 1fr 74px}
+  .ocultar-chico{display:none}
+  /* En pantalla angosta la barra de aporte se va: el múltiplo "vs. ruido" ya
+     dice lo mismo en número, y así el acelerómetro —que es el punto de esta
+     tabla— entra sin tener que arrastrar de lado. */
+  .colBar{display:none}
+  td,th{padding:6px 5px}
+  .acel{min-width:76px}
+}
+</style></head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="fila">
+    <h1>BALLENA <span>· qué mueve el precio</span></h1>
+    <div class="est">
+      <span id="gen">—</span>
+      <button id="btnRe">Recalcular</button>
+    </div>
+  </div>
+</header>
+
+<div id="errBox"></div>
+
+<div class="tabs" id="tabs"></div>
+
+<div class="card">
+  <h2 id="tVer">—</h2>
+  <p class="sub" id="sVer">—</p>
+  <div class="ver">
+    <div><div class="gr" id="grande">—</div>
+      <div class="acelT" id="grandeEt">—</div></div>
+    <div class="tx" id="veredicto">—</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>POR FAMILIA</h2>
+  <p class="sub">Cuánto aporta cada tipo de información, sumando sus variables.
+     La barra es el aporte; el número dice cuántas de esa familia superan el ruido.</p>
+  <div class="fam" id="familias"></div>
+</div>
+
+<div class="card">
+  <h2>VARIABLE POR VARIABLE</h2>
+  <p class="sub" id="subVars">—</p>
+  <div class="tblwrap"><table id="tabla"></table></div>
+  <p class="nota" id="metodo"></p>
+</div>
+
+</div>
+<script>window.__APORTE__ = {"generado": "2026-09-30T02:38:13+00:00", "dias": 5521, "variables": 100, "desde": "2011-08-19", "hasta": "2026-09-29", "metodo": {"validacion": "walk-forward purgado, 8 pliegues, ventana creciente", "importancia": "permutación fuera de muestra, 4 barajadas por variable", "piso": "6 variables de ruido puro fijan el piso; lo que no lo supera es indistinguible de un dado"}, "objetivos": {"direccion": {"titulo": "Dirección de mañana", "metrica": "AUC", "explica": "¿el precio cierra mañana arriba o abajo? 0.50 es lanzar una moneda", "base": 0.529, "piso": 0.003029, "pliegues": 8, "variables": [{"variable": "ret2", "familia": "Retornos recientes", "aporte": 0.003881, "sobre_piso": 1.28, "supera": true, "percentil_hoy": 32.9, "valor_hoy": -0.9638694045184248}, {"variable": "mapi_bull", "familia": "Flujo de órdenes", "aporte": 0.002993, "sobre_piso": 0.99, "supera": false, "percentil_hoy": 28.8, "valor_hoy": 2.118}, {"variable": "ra60_rsi_delta", "familia": "Rango y estructura", "aporte": 0.002738, "sobre_piso": 0.9, "supera": false, "percentil_hoy": 60.1, "valor_hoy": 8.7}, {"variable": "ra60_dn", "familia": "Rango y estructura", "aporte": 0.002608, "sobre_piso": 0.86, "supera": false, "percentil_hoy": 94.5, "valor_hoy": -0.99}, {"variable": "amv_rango30", "familia": "Flujo de órdenes", "aporte": 0.002499, "sobre_piso": 0.82, "supera": false, "percentil_hoy": 30.0, "valor_hoy": 15.492}, {"variable": "cuerpo_pct", "familia": "Forma de la vela", "aporte": 0.002488, "sobre_piso": 0.82, "supera": false, "percentil_hoy": 55.8, "valor_hoy": 0.19889529241202478}, {"variable": "ra60_pos", "familia": "Rango y estructura", "aporte": 0.002358, "sobre_piso": 0.78, "supera": false, "percentil_hoy": 78.5, "valor_hoy": 85.0}, {"variable": "mecha_sup", "familia": "Forma de la vela", "aporte": 0.002121, "sobre_piso": 0.7, "supera": false, "percentil_hoy": 73.4, "valor_hoy": 1.0997951138855204}, {"variable": "of_delta", "familia": "Flujo de órdenes", "aporte": 0.001971, "sobre_piso": 0.65, "supera": false, "percentil_hoy": 45.6, "valor_hoy": -0.00018350750957062099}, {"variable": "smc_fvg_bull", "familia": "Rango y estructura", "aporte": 0.001889, "sobre_piso": 0.62, "supera": false, "percentil_hoy": 79.5, "valor_hoy": 6.0}, {"variable": "racha", "familia": "Forma de la vela", "aporte": 0.001711, "sobre_piso": 0.56, "supera": false, "percentil_hoy": 50.0, "valor_hoy": 1.0}, {"variable": "obv_z20", "familia": "Volumen", "aporte": 0.001695, "sobre_piso": 0.56, "supera": false, "percentil_hoy": 48.2, "valor_hoy": -0.27514081818833763}, {"variable": "d_ema200", "familia": "Tendencia · medias", "aporte": 0.001649, "sobre_piso": 0.54, "supera": false, "percentil_hoy": 68.2, "valor_hoy": 12.466578521196258}, {"variable": "mecha_inf", "familia": "Forma de la vela", "aporte": 0.001642, "sobre_piso": 0.54, "supera": false, "percentil_hoy": 59.5, "valor_hoy": 0.8806508429086639}, {"variable": "d_ema9", "familia": "Tendencia · medias", "aporte": 0.001418, "sobre_piso": 0.47, "supera": false, "percentil_hoy": 50.8, "valor_hoy": 0.15401960829222183}, {"variable": "wl_amp", "familia": "Rango y estructura", "aporte": 0.001343, "sobre_piso": 0.44, "supera": false, "percentil_hoy": 29.0, "valor_hoy": 5.157}, {"variable": "di_minus", "familia": "Fuerza de tendencia", "aporte": 0.001119, "sobre_piso": 0.37, "supera": false, "percentil_hoy": 32.9, "valor_hoy": 16.39431157738458}, {"variable": "ret5", "familia": "Retornos recientes", "aporte": 0.000998, "sobre_piso": 0.33, "supera": false, "percentil_hoy": 38.5, "valor_hoy": -0.8799398834174355}, {"variable": "adx", "familia": "Fuerza de tendencia", "aporte": 0.000976, "sobre_piso": 0.32, "supera": false, "percentil_hoy": 86.8, "valor_hoy": 42.545310142689566}, {"variable": "wl_fase", "familia": "Rango y estructura", "aporte": 0.000952, "sobre_piso": 0.31, "supera": false, "percentil_hoy": 48.8, "valor_hoy": 1.0}, {"variable": "mom10_pct", "familia": "Momento", "aporte": 0.000881, "sobre_piso": 0.29, "supera": false, "percentil_hoy": 66.3, "valor_hoy": 2.82349002116541}, {"variable": "ra60_mov", "familia": "Rango y estructura", "aporte": 0.000829, "sobre_piso": 0.27, "supera": false, "percentil_hoy": 91.1, "valor_hoy": 32.971}, {"variable": "ema20_50", "familia": "Tendencia · medias", "aporte": 0.000758, "sobre_piso": 0.25, "supera": false, "percentil_hoy": 88.1, "valor_hoy": 5.45575826613971}, {"variable": "d_sma20", "familia": "Tendencia · medias", "aporte": 0.000685, "sobre_piso": 0.23, "supera": false, "percentil_hoy": 71.6, "valor_hoy": 3.2881784890669508}, {"variable": "ra20_pos", "familia": "Rango y estructura", "aporte": 0.000666, "sobre_piso": 0.22, "supera": false, "percentil_hoy": 62.3, "valor_hoy": 69.7}, {"variable": "ret30", "familia": "Retornos recientes", "aporte": 0.000645, "sobre_piso": 0.21, "supera": false, "percentil_hoy": 70.5, "valor_hoy": 7.658954886666325}, {"variable": "willr14", "familia": "Momento", "aporte": 0.000636, "sobre_piso": 0.21, "supera": false, "percentil_hoy": 63.8, "valor_hoy": -30.55735580038885}, {"variable": "amv_tend", "familia": "Flujo de órdenes", "aporte": 0.000587, "sobre_piso": 0.19, "supera": false, "percentil_hoy": 70.1, "valor_hoy": 9.216}, {"variable": "rango_pct", "familia": "Forma de la vela", "aporte": 0.000521, "sobre_piso": 0.17, "supera": false, "percentil_hoy": 30.7, "valor_hoy": 2.179341249206209}, {"variable": "rsi14", "familia": "Momento", "aporte": 0.000388, "sobre_piso": 0.13, "supera": false, "percentil_hoy": 74.9, "valor_hoy": 61.21283370026445}, {"variable": "d_kijun", "familia": "Tendencia · medias", "aporte": 0.000322, "sobre_piso": 0.11, "supera": false, "percentil_hoy": 64.1, "valor_hoy": 3.017778995962539}, {"variable": "ra20_mov", "familia": "Rango y estructura", "aporte": 0.000289, "sobre_piso": 0.1, "supera": false, "percentil_hoy": 74.7, "valor_hoy": 6.803}, {"variable": "amv_atr_ratio", "familia": "Flujo de órdenes", "aporte": 0.000251, "sobre_piso": 0.08, "supera": false, "percentil_hoy": 71.6, "valor_hoy": 1.124}, {"variable": "di_dif", "familia": "Fuerza de tendencia", "aporte": 0.000245, "sobre_piso": 0.08, "supera": false, "percentil_hoy": 82.3, "valor_hoy": 14.540886580235796}, {"variable": "vol_rel", "familia": "Volumen", "aporte": 0.00022, "sobre_piso": 0.07, "supera": false, "percentil_hoy": 54.9, "valor_hoy": 0.9846846749239307}, {"variable": "d_ema50", "familia": "Tendencia · medias", "aporte": 0.000206, "sobre_piso": 0.07, "supera": false, "percentil_hoy": 81.4, "valor_hoy": 7.818638695574487}, {"variable": "d_psar", "familia": "Fuerza de tendencia", "aporte": 0.00018, "sobre_piso": 0.06, "supera": false, "percentil_hoy": 63.2, "valor_hoy": 4.2461193715191525}, {"variable": "pos_donchian", "familia": "Volatilidad", "aporte": 0.000161, "sobre_piso": 0.05, "supera": false, "percentil_hoy": 62.5, "valor_hoy": 0.6968698517298187}, {"variable": "ten_dir", "familia": "Tendencia · medias", "aporte": 0.00016, "sobre_piso": 0.05, "supera": false, "percentil_hoy": 51.4, "valor_hoy": 1.0}, {"variable": "rango_med14", "familia": "Volatilidad", "aporte": 0.000135, "sobre_piso": 0.04, "supera": false, "percentil_hoy": 33.7, "valor_hoy": 2.835587007340282}, {"variable": "ret_std5", "familia": "Volatilidad", "aporte": 0.000128, "sobre_piso": 0.04, "supera": false, "percentil_hoy": 2.3, "valor_hoy": 0.6181978463765586}, {"variable": "ret3", "familia": "Retornos recientes", "aporte": 0.000116, "sobre_piso": 0.04, "supera": false, "percentil_hoy": 36.4, "valor_hoy": -0.9089497962535331}, {"variable": "d_ema20", "familia": "Tendencia · medias", "aporte": 0.000107, "sobre_piso": 0.04, "supera": false, "percentil_hoy": 68.4, "valor_hoy": 2.240636707074417}, {"variable": "smc_ob", "familia": "Rango y estructura", "aporte": 6.1e-05, "sobre_piso": 0.02, "supera": false, "percentil_hoy": 38.5, "valor_hoy": 4.0}, {"variable": "ret7", "familia": "Retornos recientes", "aporte": 6e-05, "sobre_piso": 0.02, "supera": false, "percentil_hoy": 25.8, "valor_hoy": -2.9951594437246265}, {"variable": "ra60_ema_evo", "familia": "Rango y estructura", "aporte": 5.2e-05, "sobre_piso": 0.02, "supera": false, "percentil_hoy": 45.5, "valor_hoy": 0.5}, {"variable": "vol_ratio", "familia": "Volumen", "aporte": 9e-06, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 9.6, "valor_hoy": 0.6789043546326502}, {"variable": "pos_keltner", "familia": "Volatilidad", "aporte": 9e-06, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 70.3, "valor_hoy": 0.7045246916733974}, {"variable": "mes", "familia": "Calendario", "aporte": 1e-06, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 66.6, "valor_hoy": 9.0}, {"variable": "st_dir", "familia": "Tendencia · medias", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 46.7, "valor_hoy": 1.0}, {"variable": "ten_score", "familia": "Tendencia · medias", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 70.4, "valor_hoy": 1.0}, {"variable": "ten_above", "familia": "Tendencia · medias", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 70.4, "valor_hoy": 1.0}, {"variable": "ra20_ema_evo", "familia": "Rango y estructura", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 0.0, "valor_hoy": 0.0}, {"variable": "amv_ema_align", "familia": "Flujo de órdenes", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 58.4, "valor_hoy": 1.0}, {"variable": "mapi_sesgo", "familia": "Flujo de órdenes", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 23.2, "valor_hoy": 0.0}, {"variable": "smc_fvg", "familia": "Rango y estructura", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 0.0, "valor_hoy": 8.0}, {"variable": "smc_sweeps", "familia": "Rango y estructura", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 0.0, "valor_hoy": 0.0}, {"variable": "smc_sweep_bull", "familia": "Rango y estructura", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 0.0, "valor_hoy": 0.0}, {"variable": "smc_zonas", "familia": "Rango y estructura", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 0.0, "valor_hoy": 0.0}, {"variable": "stoch_d", "familia": "Momento", "aporte": -1.5e-05, "sobre_piso": -0.0, "supera": false, "percentil_hoy": 54.7, "valor_hoy": 59.24069786350331}, {"variable": "ema50_200", "familia": "Tendencia · medias", "aporte": -1.8e-05, "sobre_piso": -0.01, "supera": false, "percentil_hoy": 54.9, "valor_hoy": 4.310887135892338}, {"variable": "ciclo", "familia": "Calendario", "aporte": -2.3e-05, "sobre_piso": -0.01, "supera": false, "percentil_hoy": 99.9, "valor_hoy": 0.6185852981969486}, {"variable": "ret14", "familia": "Retornos recientes", "aporte": -2.5e-05, "sobre_piso": -0.01, "supera": false, "percentil_hoy": 89.9, "valor_hoy": 10.557766290768233}, {"variable": "d_ema100", "familia": "Tendencia · medias", "aporte": -2.6e-05, "sobre_piso": -0.01, "supera": false, "percentil_hoy": 82.6, "valor_hoy": 12.827742413830112}, {"variable": "mapi_bear", "familia": "Flujo de órdenes", "aporte": -3.8e-05, "sobre_piso": -0.01, "supera": false, "percentil_hoy": 38.1, "valor_hoy": 1.927}, {"variable": "rango_med30", "familia": "Volatilidad", "aporte": -4e-05, "sobre_piso": -0.01, "supera": false, "percentil_hoy": 31.6, "valor_hoy": 2.8548612471584716}, {"variable": "ret1", "familia": "Retornos recientes", "aporte": -5.9e-05, "sobre_piso": -0.02, "supera": false, "percentil_hoy": 55.8, "valor_hoy": 0.19889529241201576}, {"variable": "d_st", "familia": "Tendencia · medias", "aporte": -6.3e-05, "sobre_piso": -0.02, "supera": false, "percentil_hoy": 71.2, "valor_hoy": 6.740064035349302}, {"variable": "ten_estruct", "familia": "Tendencia · medias", "aporte": -7.4e-05, "sobre_piso": -0.02, "supera": false, "percentil_hoy": 30.4, "valor_hoy": 0.0}, {"variable": "ra60_rango", "familia": "Rango y estructura", "aporte": -8.5e-05, "sobre_piso": -0.03, "supera": false, "percentil_hoy": 59.5, "valor_hoy": 30.050701328518304}, {"variable": "ten_align", "familia": "Tendencia · medias", "aporte": -9e-05, "sobre_piso": -0.03, "supera": false, "percentil_hoy": 65.8, "valor_hoy": 1.0}, {"variable": "ra60_up", "familia": "Rango y estructura", "aporte": -0.000105, "sobre_piso": -0.03, "supera": false, "percentil_hoy": 90.7, "valor_hoy": 38.969}, {"variable": "d_sma50", "familia": "Tendencia · medias", "aporte": -0.000109, "sobre_piso": -0.04, "supera": false, "percentil_hoy": 79.5, "valor_hoy": 8.760438964191298}, {"variable": "ret_std20", "familia": "Volatilidad", "aporte": -0.000122, "sobre_piso": -0.04, "supera": false, "percentil_hoy": 65.6, "valor_hoy": 2.3361302729506637}, {"variable": "amv_sweep", "familia": "Flujo de órdenes", "aporte": -0.000161, "sobre_piso": -0.05, "supera": false, "percentil_hoy": 0.0, "valor_hoy": -1.0}, {"variable": "aroon_up", "familia": "Fuerza de tendencia", "aporte": -0.000253, "sobre_piso": -0.08, "supera": false, "percentil_hoy": 43.3, "valor_hoy": 42.857142857142854}, {"variable": "aroon_dif", "familia": "Fuerza de tendencia", "aporte": -0.000345, "sobre_piso": -0.11, "supera": false, "percentil_hoy": 56.7, "valor_hoy": 42.857142857142854}, {"variable": "dow", "familia": "Calendario", "aporte": -0.000362, "sobre_piso": -0.12, "supera": false, "percentil_hoy": 14.4, "valor_hoy": 1.0}, {"variable": "of_ultima", "familia": "Flujo de órdenes", "aporte": -0.000387, "sobre_piso": -0.13, "supera": false, "percentil_hoy": 32.1, "valor_hoy": 0.0}, {"variable": "ra20_up", "familia": "Rango y estructura", "aporte": -0.000458, "sobre_piso": -0.15, "supera": false, "percentil_hoy": 73.3, "valor_hoy": 11.62}, {"variable": "sd20_pct", "familia": "Volatilidad", "aporte": -0.000465, "sobre_piso": -0.15, "supera": false, "percentil_hoy": 80.4, "valor_hoy": 4.418129140816071}, {"variable": "ao_pct", "familia": "Momento", "aporte": -0.000511, "sobre_piso": -0.17, "supera": false, "percentil_hoy": 75.5, "valor_hoy": 4.783053109078577}, {"variable": "d_tenkan", "familia": "Tendencia · medias", "aporte": -0.000543, "sobre_piso": -0.18, "supera": false, "percentil_hoy": 39.7, "valor_hoy": -0.5958755852667919}, {"variable": "aroon_dn", "familia": "Fuerza de tendencia", "aporte": -0.000576, "sobre_piso": -0.19, "supera": false, "percentil_hoy": 0.0, "valor_hoy": 0.0}, {"variable": "of_pres", "familia": "Flujo de órdenes", "aporte": -0.000641, "sobre_piso": -0.21, "supera": false, "percentil_hoy": 87.0, "valor_hoy": 0.282}, {"variable": "of_cvd", "familia": "Flujo de órdenes", "aporte": -0.000711, "sobre_piso": -0.23, "supera": false, "percentil_hoy": 86.8, "valor_hoy": 0.1389813384379028}, {"variable": "di_plus", "familia": "Fuerza de tendencia", "aporte": -0.000777, "sobre_piso": -0.26, "supera": false, "percentil_hoy": 88.4, "valor_hoy": 30.935198157620377}, {"variable": "rango_med5", "familia": "Volatilidad", "aporte": -0.000875, "sobre_piso": -0.29, "supera": false, "percentil_hoy": 5.2, "valor_hoy": 1.938177732567885}, {"variable": "wl_bars", "familia": "Rango y estructura", "aporte": -0.001027, "sobre_piso": -0.34, "supera": false, "percentil_hoy": 56.2, "valor_hoy": 28.3}, {"variable": "ra20_rango", "familia": "Rango y estructura", "aporte": -0.001142, "sobre_piso": -0.38, "supera": false, "percentil_hoy": 50.1, "valor_hoy": 14.879763712676528}, {"variable": "amv_fase", "familia": "Flujo de órdenes", "aporte": -0.001315, "sobre_piso": -0.43, "supera": false, "percentil_hoy": 48.8, "valor_hoy": 2.0}, {"variable": "cmf20", "familia": "Volumen", "aporte": -0.001347, "sobre_piso": -0.44, "supera": false, "percentil_hoy": 49.3, "valor_hoy": 0.046877157790348706}, {"variable": "ema9_20", "familia": "Tendencia · medias", "aporte": -0.001458, "sobre_piso": -0.48, "supera": false, "percentil_hoy": 78.4, "valor_hoy": 2.0834082415693844}, {"variable": "atr14_pct", "familia": "Volatilidad", "aporte": -0.001576, "sobre_piso": -0.52, "supera": false, "percentil_hoy": 22.5, "valor_hoy": 2.683102694436384}, {"variable": "dom", "familia": "Calendario", "aporte": -0.001595, "sobre_piso": -0.53, "supera": false, "percentil_hoy": 92.1, "valor_hoy": 29.0}, {"variable": "ra20_dn", "familia": "Rango y estructura", "aporte": -0.002133, "sobre_piso": -0.7, "supera": false, "percentil_hoy": 62.1, "valor_hoy": -4.272}, {"variable": "ra20_rsi_delta", "familia": "Rango y estructura", "aporte": -0.002366, "sobre_piso": -0.78, "supera": false, "percentil_hoy": 33.6, "valor_hoy": -4.7}, {"variable": "cci20", "familia": "Momento", "aporte": -0.00283, "sobre_piso": -0.93, "supera": false, "percentil_hoy": 61.2, "valor_hoy": 55.77713382700709}, {"variable": "stoch_k", "familia": "Momento", "aporte": -0.00381, "sobre_piso": -1.26, "supera": false, "percentil_hoy": 50.1, "valor_hoy": 53.63823766276018}, {"variable": "mapi_net", "familia": "Flujo de órdenes", "aporte": -0.00435, "sobre_piso": -1.44, "supera": false, "percentil_hoy": 40.4, "valor_hoy": 0.191}], "familias": [{"familia": "Rango y estructura", "aporte": 0.013785, "n": 23, "superan": 0, "mejor": "ra60_rsi_delta"}, {"familia": "Forma de la vela", "aporte": 0.008483, "n": 5, "superan": 0, "mejor": "cuerpo_pct"}, {"familia": "Flujo de órdenes", "aporte": 0.008301, "n": 14, "superan": 0, "mejor": "mapi_bull"}, {"familia": "Retornos recientes", "aporte": 0.0057, "n": 7, "superan": 1, "mejor": "ret2"}, {"familia": "Tendencia · medias", "aporte": 0.005305, "n": 19, "superan": 0, "mejor": "d_ema200"}, {"familia": "Fuerza de tendencia", "aporte": 0.00252, "n": 8, "superan": 0, "mejor": "di_minus"}, {"familia": "Volumen", "aporte": 0.001924, "n": 4, "superan": 0, "mejor": "obv_z20"}, {"familia": "Momento", "aporte": 0.001905, "n": 7, "superan": 0, "mejor": "mom10_pct"}, {"familia": "Volatilidad", "aporte": 0.000433, "n": 9, "superan": 0, "mejor": "pos_donchian"}, {"familia": "Calendario", "aporte": 1e-06, "n": 4, "superan": 0, "mejor": "mes"}], "cuantas_superan": 1}, "tamano": {"titulo": "Tamaño del movimiento", "metrica": "error absoluto medio", "explica": "¿qué tanto se moverá el precio mañana, sin importar hacia dónde?", "base": -1.977, "piso": 0.000294, "pliegues": 8, "variables": [{"variable": "rango_pct", "familia": "Forma de la vela", "aporte": 0.071909, "sobre_piso": 244.19, "supera": true, "percentil_hoy": 30.7, "valor_hoy": 2.179341249206209}, {"variable": "dow", "familia": "Calendario", "aporte": 0.03205, "sobre_piso": 108.84, "supera": true, "percentil_hoy": 14.4, "valor_hoy": 1.0}, {"variable": "sd20_pct", "familia": "Volatilidad", "aporte": 0.029167, "sobre_piso": 99.05, "supera": true, "percentil_hoy": 80.4, "valor_hoy": 4.418129140816071}, {"variable": "rango_med5", "familia": "Volatilidad", "aporte": 0.026312, "sobre_piso": 89.35, "supera": true, "percentil_hoy": 5.2, "valor_hoy": 1.938177732567885}, {"variable": "ema50_200", "familia": "Tendencia · medias", "aporte": 0.02117, "sobre_piso": 71.89, "supera": true, "percentil_hoy": 54.9, "valor_hoy": 4.310887135892338}, {"variable": "ra60_dn", "familia": "Rango y estructura", "aporte": 0.012511, "sobre_piso": 42.48, "supera": true, "percentil_hoy": 94.5, "valor_hoy": -0.99}, {"variable": "d_tenkan", "familia": "Tendencia · medias", "aporte": 0.009758, "sobre_piso": 33.14, "supera": true, "percentil_hoy": 39.7, "valor_hoy": -0.5958755852667919}, {"variable": "ra20_rango", "familia": "Rango y estructura", "aporte": 0.00712, "sobre_piso": 24.18, "supera": true, "percentil_hoy": 50.1, "valor_hoy": 14.879763712676528}, {"variable": "ema20_50", "familia": "Tendencia · medias", "aporte": 0.006639, "sobre_piso": 22.55, "supera": true, "percentil_hoy": 88.1, "valor_hoy": 5.45575826613971}, {"variable": "ra60_rango", "familia": "Rango y estructura", "aporte": 0.005955, "sobre_piso": 20.22, "supera": true, "percentil_hoy": 59.5, "valor_hoy": 30.050701328518304}, {"variable": "ret2", "familia": "Retornos recientes", "aporte": 0.005672, "sobre_piso": 19.26, "supera": true, "percentil_hoy": 32.9, "valor_hoy": -0.9638694045184248}, {"variable": "amv_tend", "familia": "Flujo de órdenes", "aporte": 0.004886, "sobre_piso": 16.59, "supera": true, "percentil_hoy": 70.1, "valor_hoy": 9.216}, {"variable": "ret3", "familia": "Retornos recientes", "aporte": 0.004227, "sobre_piso": 14.36, "supera": true, "percentil_hoy": 36.4, "valor_hoy": -0.9089497962535331}, {"variable": "d_ema200", "familia": "Tendencia · medias", "aporte": 0.004147, "sobre_piso": 14.08, "supera": true, "percentil_hoy": 68.2, "valor_hoy": 12.466578521196258}, {"variable": "ra60_mov", "familia": "Rango y estructura", "aporte": 0.003721, "sobre_piso": 12.64, "supera": true, "percentil_hoy": 91.1, "valor_hoy": 32.971}, {"variable": "d_sma20", "familia": "Tendencia · medias", "aporte": 0.003001, "sobre_piso": 10.19, "supera": true, "percentil_hoy": 71.6, "valor_hoy": 3.2881784890669508}, {"variable": "pos_donchian", "familia": "Volatilidad", "aporte": 0.002596, "sobre_piso": 8.82, "supera": true, "percentil_hoy": 62.5, "valor_hoy": 0.6968698517298187}, {"variable": "rango_med14", "familia": "Volatilidad", "aporte": 0.002544, "sobre_piso": 8.64, "supera": true, "percentil_hoy": 33.7, "valor_hoy": 2.835587007340282}, {"variable": "d_ema9", "familia": "Tendencia · medias", "aporte": 0.002355, "sobre_piso": 8.0, "supera": true, "percentil_hoy": 50.8, "valor_hoy": 0.15401960829222183}, {"variable": "ra20_up", "familia": "Rango y estructura", "aporte": 0.002156, "sobre_piso": 7.32, "supera": true, "percentil_hoy": 73.3, "valor_hoy": 11.62}, {"variable": "ret1", "familia": "Retornos recientes", "aporte": 0.001988, "sobre_piso": 6.75, "supera": true, "percentil_hoy": 55.8, "valor_hoy": 0.19889529241201576}, {"variable": "ema9_20", "familia": "Tendencia · medias", "aporte": 0.001935, "sobre_piso": 6.57, "supera": true, "percentil_hoy": 78.4, "valor_hoy": 2.0834082415693844}, {"variable": "cuerpo_pct", "familia": "Forma de la vela", "aporte": 0.001587, "sobre_piso": 5.39, "supera": true, "percentil_hoy": 55.8, "valor_hoy": 0.19889529241202478}, {"variable": "mom10_pct", "familia": "Momento", "aporte": 0.001562, "sobre_piso": 5.31, "supera": true, "percentil_hoy": 66.3, "valor_hoy": 2.82349002116541}, {"variable": "willr14", "familia": "Momento", "aporte": 0.001424, "sobre_piso": 4.84, "supera": true, "percentil_hoy": 63.8, "valor_hoy": -30.55735580038885}, {"variable": "ret7", "familia": "Retornos recientes", "aporte": 0.00142, "sobre_piso": 4.82, "supera": true, "percentil_hoy": 25.8, "valor_hoy": -2.9951594437246265}, {"variable": "ret14", "familia": "Retornos recientes", "aporte": 0.001266, "sobre_piso": 4.3, "supera": true, "percentil_hoy": 89.9, "valor_hoy": 10.557766290768233}, {"variable": "amv_rango30", "familia": "Flujo de órdenes", "aporte": 0.00114, "sobre_piso": 3.87, "supera": true, "percentil_hoy": 30.0, "valor_hoy": 15.492}, {"variable": "ret30", "familia": "Retornos recientes", "aporte": 0.001041, "sobre_piso": 3.54, "supera": true, "percentil_hoy": 70.5, "valor_hoy": 7.658954886666325}, {"variable": "d_ema20", "familia": "Tendencia · medias", "aporte": 0.001026, "sobre_piso": 3.48, "supera": true, "percentil_hoy": 68.4, "valor_hoy": 2.240636707074417}, {"variable": "rango_med30", "familia": "Volatilidad", "aporte": 0.000897, "sobre_piso": 3.05, "supera": true, "percentil_hoy": 31.6, "valor_hoy": 2.8548612471584716}, {"variable": "stoch_d", "familia": "Momento", "aporte": 0.000761, "sobre_piso": 2.58, "supera": true, "percentil_hoy": 54.7, "valor_hoy": 59.24069786350331}, {"variable": "mecha_sup", "familia": "Forma de la vela", "aporte": 0.000754, "sobre_piso": 2.56, "supera": true, "percentil_hoy": 73.4, "valor_hoy": 1.0997951138855204}, {"variable": "di_minus", "familia": "Fuerza de tendencia", "aporte": 0.00074, "sobre_piso": 2.51, "supera": true, "percentil_hoy": 32.9, "valor_hoy": 16.39431157738458}, {"variable": "ra60_up", "familia": "Rango y estructura", "aporte": 0.000702, "sobre_piso": 2.38, "supera": true, "percentil_hoy": 90.7, "valor_hoy": 38.969}, {"variable": "obv_z20", "familia": "Volumen", "aporte": 0.000539, "sobre_piso": 1.83, "supera": true, "percentil_hoy": 48.2, "valor_hoy": -0.27514081818833763}, {"variable": "ao_pct", "familia": "Momento", "aporte": 0.000474, "sobre_piso": 1.61, "supera": true, "percentil_hoy": 75.5, "valor_hoy": 4.783053109078577}, {"variable": "d_st", "familia": "Tendencia · medias", "aporte": 0.000437, "sobre_piso": 1.49, "supera": true, "percentil_hoy": 71.2, "valor_hoy": 6.740064035349302}, {"variable": "ra60_pos", "familia": "Rango y estructura", "aporte": 0.000305, "sobre_piso": 1.03, "supera": true, "percentil_hoy": 78.5, "valor_hoy": 85.0}, {"variable": "ret_std20", "familia": "Volatilidad", "aporte": 0.000227, "sobre_piso": 0.77, "supera": false, "percentil_hoy": 65.6, "valor_hoy": 2.3361302729506637}, {"variable": "cci20", "familia": "Momento", "aporte": 0.00016, "sobre_piso": 0.54, "supera": false, "percentil_hoy": 61.2, "valor_hoy": 55.77713382700709}, {"variable": "smc_fvg_bull", "familia": "Rango y estructura", "aporte": 0.00014, "sobre_piso": 0.48, "supera": false, "percentil_hoy": 79.5, "valor_hoy": 6.0}, {"variable": "d_ema100", "familia": "Tendencia · medias", "aporte": 9.8e-05, "sobre_piso": 0.33, "supera": false, "percentil_hoy": 82.6, "valor_hoy": 12.827742413830112}, {"variable": "atr14_pct", "familia": "Volatilidad", "aporte": 9e-06, "sobre_piso": 0.03, "supera": false, "percentil_hoy": 22.5, "valor_hoy": 2.683102694436384}, {"variable": "aroon_up", "familia": "Fuerza de tendencia", "aporte": 4e-06, "sobre_piso": 0.01, "supera": false, "percentil_hoy": 43.3, "valor_hoy": 42.857142857142854}, {"variable": "mecha_inf", "familia": "Forma de la vela", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 59.5, "valor_hoy": 0.8806508429086639}, {"variable": "vol_ratio", "familia": "Volumen", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 9.6, "valor_hoy": 0.6789043546326502}, {"variable": "racha", "familia": "Forma de la vela", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 50.0, "valor_hoy": 1.0}, {"variable": "mes", "familia": "Calendario", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 66.6, "valor_hoy": 9.0}, {"variable": "dom", "familia": "Calendario", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 92.1, "valor_hoy": 29.0}, {"variable": "d_ema50", "familia": "Tendencia · medias", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 81.4, "valor_hoy": 7.818638695574487}, {"variable": "st_dir", "familia": "Tendencia · medias", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 46.7, "valor_hoy": 1.0}, {"variable": "aroon_dn", "familia": "Fuerza de tendencia", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 0.0, "valor_hoy": 0.0}, {"variable": "aroon_dif", "familia": "Fuerza de tendencia", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 56.7, "valor_hoy": 42.857142857142854}, {"variable": "ten_dir", "familia": "Tendencia · medias", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 51.4, "valor_hoy": 1.0}, {"variable": "ten_score", "familia": "Tendencia · medias", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 70.4, "valor_hoy": 1.0}, {"variable": "ten_align", "familia": "Tendencia · medias", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 65.8, "valor_hoy": 1.0}, {"variable": "ten_above", "familia": "Tendencia · medias", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 70.4, "valor_hoy": 1.0}, {"variable": "ten_estruct", "familia": "Tendencia · medias", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 30.4, "valor_hoy": 0.0}, {"variable": "ra20_ema_evo", "familia": "Rango y estructura", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 0.0, "valor_hoy": 0.0}, {"variable": "ra60_ema_evo", "familia": "Rango y estructura", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 45.5, "valor_hoy": 0.5}, {"variable": "ra60_rsi_delta", "familia": "Rango y estructura", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 60.1, "valor_hoy": 8.7}, {"variable": "of_pres", "familia": "Flujo de órdenes", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 87.0, "valor_hoy": 0.282}, {"variable": "of_ultima", "familia": "Flujo de órdenes", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 32.1, "valor_hoy": 0.0}, {"variable": "amv_fase", "familia": "Flujo de órdenes", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 48.8, "valor_hoy": 2.0}, {"variable": "amv_atr_ratio", "familia": "Flujo de órdenes", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 71.6, "valor_hoy": 1.124}, {"variable": "amv_ema_align", "familia": "Flujo de órdenes", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 58.4, "valor_hoy": 1.0}, {"variable": "amv_sweep", "familia": "Flujo de órdenes", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 0.0, "valor_hoy": -1.0}, {"variable": "mapi_net", "familia": "Flujo de órdenes", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 40.4, "valor_hoy": 0.191}, {"variable": "mapi_bull", "familia": "Flujo de órdenes", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 28.8, "valor_hoy": 2.118}, {"variable": "mapi_sesgo", "familia": "Flujo de órdenes", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 23.2, "valor_hoy": 0.0}, {"variable": "smc_fvg", "familia": "Rango y estructura", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 0.0, "valor_hoy": 8.0}, {"variable": "smc_ob", "familia": "Rango y estructura", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 38.5, "valor_hoy": 4.0}, {"variable": "smc_sweeps", "familia": "Rango y estructura", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 0.0, "valor_hoy": 0.0}, {"variable": "smc_sweep_bull", "familia": "Rango y estructura", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 0.0, "valor_hoy": 0.0}, {"variable": "smc_zonas", "familia": "Rango y estructura", "aporte": 0.0, "sobre_piso": 0.0, "supera": false, "percentil_hoy": 0.0, "valor_hoy": 0.0}, {"variable": "wl_fase", "familia": "Rango y estructura", "aporte": -1.5e-05, "sobre_piso": -0.05, "supera": false, "percentil_hoy": 48.8, "valor_hoy": 1.0}, {"variable": "ra20_pos", "familia": "Rango y estructura", "aporte": -4.6e-05, "sobre_piso": -0.16, "supera": false, "percentil_hoy": 62.3, "valor_hoy": 69.7}, {"variable": "ra20_mov", "familia": "Rango y estructura", "aporte": -6.8e-05, "sobre_piso": -0.23, "supera": false, "percentil_hoy": 74.7, "valor_hoy": 6.803}, {"variable": "mapi_bear", "familia": "Flujo de órdenes", "aporte": -9.2e-05, "sobre_piso": -0.31, "supera": false, "percentil_hoy": 38.1, "valor_hoy": 1.927}, {"variable": "adx", "familia": "Fuerza de tendencia", "aporte": -0.000136, "sobre_piso": -0.46, "supera": false, "percentil_hoy": 86.8, "valor_hoy": 42.545310142689566}, {"variable": "d_psar", "familia": "Fuerza de tendencia", "aporte": -0.000138, "sobre_piso": -0.47, "supera": false, "percentil_hoy": 63.2, "valor_hoy": 4.2461193715191525}, {"variable": "d_kijun", "familia": "Tendencia · medias", "aporte": -0.000151, "sobre_piso": -0.51, "supera": false, "percentil_hoy": 64.1, "valor_hoy": 3.017778995962539}, {"variable": "of_delta", "familia": "Flujo de órdenes", "aporte": -0.000187, "sobre_piso": -0.63, "supera": false, "percentil_hoy": 45.6, "valor_hoy": -0.00018350750957062099}, {"variable": "wl_bars", "familia": "Rango y estructura", "aporte": -0.000278, "sobre_piso": -0.94, "supera": false, "percentil_hoy": 56.2, "valor_hoy": 28.3}, {"variable": "of_cvd", "familia": "Flujo de órdenes", "aporte": -0.000321, "sobre_piso": -1.09, "supera": false, "percentil_hoy": 86.8, "valor_hoy": 0.1389813384379028}, {"variable": "ra20_dn", "familia": "Rango y estructura", "aporte": -0.000327, "sobre_piso": -1.11, "supera": false, "percentil_hoy": 62.1, "valor_hoy": -4.272}, {"variable": "stoch_k", "familia": "Momento", "aporte": -0.000367, "sobre_piso": -1.25, "supera": false, "percentil_hoy": 50.1, "valor_hoy": 53.63823766276018}, {"variable": "wl_amp", "familia": "Rango y estructura", "aporte": -0.000402, "sobre_piso": -1.37, "supera": false, "percentil_hoy": 29.0, "valor_hoy": 5.157}, {"variable": "ret5", "familia": "Retornos recientes", "aporte": -0.000487, "sobre_piso": -1.65, "supera": false, "percentil_hoy": 38.5, "valor_hoy": -0.8799398834174355}, {"variable": "ciclo", "familia": "Calendario", "aporte": -0.000575, "sobre_piso": -1.95, "supera": false, "percentil_hoy": 99.9, "valor_hoy": 0.6185852981969486}, {"variable": "vol_rel", "familia": "Volumen", "aporte": -0.000595, "sobre_piso": -2.02, "supera": false, "percentil_hoy": 54.9, "valor_hoy": 0.9846846749239307}, {"variable": "ret_std5", "familia": "Volatilidad", "aporte": -0.000899, "sobre_piso": -3.05, "supera": false, "percentil_hoy": 2.3, "valor_hoy": 0.6181978463765586}, {"variable": "rsi14", "familia": "Momento", "aporte": -0.001051, "sobre_piso": -3.57, "supera": false, "percentil_hoy": 74.9, "valor_hoy": 61.21283370026445}, {"variable": "di_dif", "familia": "Fuerza de tendencia", "aporte": -0.001337, "sobre_piso": -4.54, "supera": false, "percentil_hoy": 82.3, "valor_hoy": 14.540886580235796}, {"variable": "d_sma50", "familia": "Tendencia · medias", "aporte": -0.001351, "sobre_piso": -4.59, "supera": false, "percentil_hoy": 79.5, "valor_hoy": 8.760438964191298}, {"variable": "pos_keltner", "familia": "Volatilidad", "aporte": -0.00215, "sobre_piso": -7.3, "supera": false, "percentil_hoy": 70.3, "valor_hoy": 0.7045246916733974}, {"variable": "di_plus", "familia": "Fuerza de tendencia", "aporte": -0.003116, "sobre_piso": -10.58, "supera": false, "percentil_hoy": 88.4, "valor_hoy": 30.935198157620377}, {"variable": "ra20_rsi_delta", "familia": "Rango y estructura", "aporte": -0.004336, "sobre_piso": -14.72, "supera": false, "percentil_hoy": 33.6, "valor_hoy": -4.7}, {"variable": "cmf20", "familia": "Volumen", "aporte": -0.006206, "sobre_piso": -21.08, "supera": false, "percentil_hoy": 49.3, "valor_hoy": 0.046877157790348706}], "familias": [{"familia": "Forma de la vela", "aporte": 0.07425, "n": 5, "superan": 3, "mejor": "rango_pct"}, {"familia": "Volatilidad", "aporte": 0.061752, "n": 9, "superan": 5, "mejor": "sd20_pct"}, {"familia": "Tendencia · medias", "aporte": 0.050566, "n": 19, "superan": 9, "mejor": "ema50_200"}, {"familia": "Rango y estructura", "aporte": 0.03261, "n": 23, "superan": 7, "mejor": "ra60_dn"}, {"familia": "Calendario", "aporte": 0.03205, "n": 4, "superan": 1, "mejor": "dow"}, {"familia": "Retornos recientes", "aporte": 0.015614, "n": 7, "superan": 6, "mejor": "ret2"}, {"familia": "Flujo de órdenes", "aporte": 0.006026, "n": 14, "superan": 2, "mejor": "amv_tend"}, {"familia": "Momento", "aporte": 0.004381, "n": 7, "superan": 4, "mejor": "mom10_pct"}, {"familia": "Fuerza de tendencia", "aporte": 0.000744, "n": 8, "superan": 1, "mejor": "di_minus"}, {"familia": "Volumen", "aporte": 0.000539, "n": 4, "superan": 1, "mejor": "obv_z20"}], "cuantas_superan": 39}}, "segundos": 29.2, "publicado": "2026-10-04T08:41:02+00:00", "estatico": true, "ok": true, "calculando": false, "ultimo_error": null};</script>
+<script>
+const $ = id => document.getElementById(id);
+let D = null, OBJ = null;
+const esc = s => String(s).replace(/[&<>"]/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const nf = (v, d=2) => v == null || !isFinite(v) ? "—"
+  : v.toLocaleString("es-MX", {minimumFractionDigits:d, maximumFractionDigits:d});
+
+// La misma página sirve en dos modos. Con servidor (Ballena) pide el puntaje
+// a /api/aporte. Publicada como sitio estático no hay servidor que preguntar,
+// así que el generador incrusta los datos en window.__APORTE__ y se leen de
+// ahí. Un solo archivo para los dos, para que no se desincronicen.
+const ESTATICO = typeof window.__APORTE__ !== "undefined";
+
+async function carga(){
+  let j;
+  if(ESTATICO){
+    j = window.__APORTE__;
+  } else {
+    try{ j = await (await fetch("/api/aporte")).json(); }
+    catch(e){ $("errBox").innerHTML = `<div class="err">Sin conexión: ${esc(e)}</div>`; return; }
+  }
+  if(!j.ok){
+    $("errBox").innerHTML = `<div class="err"><b>Todavía no hay medición.</b> ` +
+      `${esc(j.err || "")} — córrela con <code>${esc(j.como || "python ML/aporte.py")}</code></div>`;
+    return;
+  }
+  $("errBox").innerHTML = j.ultimo_error
+    ? `<div class="err">La última recalculación falló: ${esc(j.ultimo_error)}</div>` : "";
+  D = j;
+  $("gen").textContent = `${j.dias.toLocaleString("es-MX")} días · ` +
+    `${j.desde} → ${j.hasta} · medido ${(j.generado||"").slice(0,10)}`;
+  if(ESTATICO){
+    // Sin servidor no hay nada que recalcular: se publica una foto.
+    $("btnRe").style.display = "none";
+  } else {
+    $("btnRe").disabled = !!j.calculando;
+    $("btnRe").textContent = j.calculando ? "calculando…" : "Recalcular";
+    if(j.calculando) setTimeout(carga, 5000);
+  }
+
+  const claves = Object.keys(j.objetivos);
+  if(!claves.includes(OBJ)) OBJ = claves[0];
+  $("tabs").innerHTML = claves.map(k =>
+    `<button data-k="${k}" class="${k===OBJ?"on":""}">${esc(j.objetivos[k].titulo)}</button>`
+  ).join("");
+  [...$("tabs").children].forEach(b => b.onclick = () => {
+    OBJ = b.dataset.k;
+    [...$("tabs").children].forEach(x => x.classList.toggle("on", x===b));
+    pinta();
+  });
+  pinta();
+}
+
+function pinta(){
+  const o = D.objetivos[OBJ];
+  const esDir = OBJ === "direccion";
+  $("tVer").textContent = o.titulo.toUpperCase();
+  $("sVer").textContent = o.explica;
+
+  // El marcador grande: qué tan bien se adivina, antes de hablar de variables.
+  const val = esDir ? o.base : Math.abs(o.base);
+  $("grande").textContent = esDir ? nf(val, 3) : nf(val, 2) + " %";
+  $("grande").style.color = esDir
+    ? (val > 0.55 ? "var(--up)" : val > 0.52 ? "var(--oro)" : "var(--down)")
+    : "var(--acc)";
+  $("grandeEt").textContent = esDir ? "AUC · 0.500 = volado"
+                                    : "error típico al adivinar el recorrido del día";
+  $("veredicto").innerHTML = esDir
+    ? `Con las 100 variables juntas, adivinar si mañana sube o baja da <b>${nf(o.base,3)}</b>,
+       y lanzar una moneda da 0.500. <b>${o.cuantas_superan} de ${o.variables.length}</b>
+       variables superan el ruido. La dirección del precio casi no se puede anticipar, y
+       este tabulador lo dice en vez de esconderlo: si abajo ves barras, son barras chicas.`
+    : `El recorrido del día se falla por <b>${nf(Math.abs(o.base),2)} %</b> en promedio, y
+       <b>${o.cuantas_superan} de ${o.variables.length}</b> variables superan el ruido.
+       Aquí sí hay estructura: el mercado no dice hacia dónde va, pero sí avisa
+       cuándo se va a mover fuerte.`;
+
+  // Familias
+  const fmax = Math.max(...o.familias.map(f => f.aporte), 1e-9);
+  $("familias").innerHTML = o.familias.map(f => `
+    <div class="frow">
+      <div class="n">${esc(f.familia)}</div>
+      <div class="bar"><i style="width:${(f.aporte/fmax*100).toFixed(1)}%;
+        background:${f.superan ? "var(--acc)" : "var(--ruido)"}"></i></div>
+      <div class="c">${f.superan}/${f.n} sobre ruido</div>
+    </div>`).join("");
+
+  // Variables, de más a menos
+  const vs = o.variables.slice(0, 40);
+  const vmax = Math.max(...vs.map(v => v.aporte), 1e-9);
+  $("subVars").innerHTML =
+    `Ordenadas de mayor a menor aporte. El <b>acelerómetro</b> de la derecha no mide aporte:
+     mide dónde está esa variable <b>hoy</b> contra sus últimos dos años, de su mínimo
+     (izquierda) a su máximo (derecha). Las filas apagadas no superan el piso de ruido
+     (${nf(o.piso,5)}), o sea que no se distinguen de un dado.`;
+  $("tabla").innerHTML =
+    `<thead><tr><th></th><th>Variable</th><th class="ocultar-chico">Familia</th>
+      <th class="colBar">Aporte</th><th style="text-align:right">vs. ruido</th>
+      <th>Hoy</th><th style="text-align:right">Percentil</th></tr></thead><tbody>` +
+    vs.map((v, i) => {
+      const p = v.percentil_hoy;
+      return `<tr class="${v.supera ? "" : "debil"}">
+        <td class="pos">${i+1}</td>
+        <td><span class="nom">${esc(v.variable)}</span></td>
+        <td class="fa ocultar-chico">${esc(v.familia)}</td>
+        <td class="colBar" style="min-width:110px"><div class="bar"><i style="width:${
+            (Math.max(v.aporte,0)/vmax*100).toFixed(1)}%;background:${
+            v.supera ? "var(--up)" : "var(--ruido)"}"></i></div></td>
+        <td class="mult" style="color:${v.supera ? "var(--up)" : "var(--mut)"}">${
+            v.sobre_piso == null ? "—" : v.sobre_piso + "×"}</td>
+        <td><div class="acel"><b></b>${p == null ? "" :
+            `<i style="left:calc(${Math.max(0,Math.min(100,p))}% - 1.5px)"></i>`}</div></td>
+        <td class="acelT" style="text-align:right">${p == null ? "—" : nf(p,0)}</td>
+      </tr>`;
+    }).join("") + `</tbody>`;
+
+  $("metodo").innerHTML =
+    `<b>Cómo se mide.</b> ${esc(D.metodo.validacion)}. Para cada variable: ${esc(D.metodo.importancia)}
+     — se baraja su columna en el tramo de prueba y se mira cuánto empeora la predicción.
+     Lo que no se pierde al destruirla, no aportaba. ${esc(D.metodo.piso)}.
+     Esto no es la "importancia" que reportan los modelos de árboles: esa se calcula
+     con los mismos datos del entrenamiento y en series financieras infla el ruido.`;
+}
+
+$("btnRe").addEventListener("click", async () => {
+  $("btnRe").disabled = true; $("btnRe").textContent = "calculando…";
+  try{ await fetch("/api/aporte/recalcular", {method:"POST"}); }catch(_){}
+  setTimeout(carga, 3000);
+});
+
+carga();
+</script>
+</body></html>
